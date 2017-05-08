@@ -61,6 +61,8 @@ UKF::UKF() {
   weights_ = VectorXd(2 * n_aug_ + 1);
 
   lambda_ = 3 - n_aug_;
+
+  is_initialized_ = false;
 }
 
 UKF::~UKF() {}
@@ -70,6 +72,7 @@ UKF::~UKF() {}
  * either radar or laser.
  */
 void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
+
   if (!is_initialized_) {
     // first measurement
     cout << "UKF: " << endl;
@@ -311,6 +314,17 @@ void UKF::UpdateLidar(MeasurementPackage meas_package) {
   NIS_laser_ = z_diff.transpose() * S.inverse() * z_diff;
 }
 
+double normalizeAngle_(double angle)
+{
+  while (angle > M_PI) {
+  	angle -= 2.0 * M_PI;
+  }
+  while (angle < -M_PI) {
+  	angle += 2.0 * M_PI;
+  }
+  return angle;
+}
+
 /**
  * Updates the state and the state covariance matrix using a radar measurement.
  * @param {MeasurementPackage} meas_package
@@ -347,8 +361,8 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
     }
 
     Zsig(0,i) = sqrt(p_x*p_x + p_y*p_y);
-    Zsig(1,i) = atan2(p_y,p_x);
-    Zsig(2,i) = (p_x*v1 + p_y*v2 ) / sqrt(p_x*p_x + p_y*p_y);
+    Zsig(1,i) = atan2(p_y, p_x);
+    Zsig(2,i) = (p_x*v1 + p_y*v2) / sqrt(p_x*p_x + p_y*p_y);
   }
 
   z_pred = Zsig * weights_;
@@ -359,13 +373,7 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
 
     VectorXd z_diff = Zsig.col(i) - z_pred;
 
-    //angle normalization
-    while (z_diff(3) > M_PI) {
-      z_diff(3) -= 2.0 * M_PI;
-    }
-    while (z_diff(3) < -M_PI) {
-      z_diff(3) += 2.0 * M_PI;
-    }
+	z_diff(1) = normalizeAngle_(z_diff(1));
 
     z_sig_diff.push_back(z_diff);
 
@@ -386,13 +394,7 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
     VectorXd z_diff = z_sig_diff[i];
     VectorXd x_diff = Xsig_pred_.col(i) - x_;
 
-   //angle normalization
-    while (x_diff(3) > M_PI) {
-      x_diff(3) -= 2.0 * M_PI;
-    }
-    while (x_diff(3) < -M_PI) {
-      x_diff(3) += 2.0 * M_PI;
-    }
+	x_diff(1) = normalizeAngle_(x_diff(1));
 
     Tc = Tc + weights_(i) * x_diff * z_diff.transpose();
   }
@@ -402,12 +404,7 @@ void UKF::UpdateRadar(MeasurementPackage meas_package) {
   VectorXd z_diff = z - z_pred;
 
   //angle normalization
-  while (z_diff(3) > M_PI) {
-    z_diff(3) -= 2.0 * M_PI;
-  }
-  while (z_diff(3) < -M_PI) {
-    z_diff(3) += 2.0 * M_PI;
-  }
+  z_diff(1) = normalizeAngle_(z_diff(1));
 
   //update state mean and covariance matrix
   x_ = x_ + K * z_diff;
