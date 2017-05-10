@@ -22,6 +22,10 @@ UKF::UKF() {
 
   n_aug_ = 7;
 
+  n_sig_ = 2 * n_aug_ + 1;
+
+  n_z_laser_ = 2;
+
   // initial state vector
   x_ = VectorXd(n_x_);
 
@@ -53,12 +57,15 @@ UKF::UKF() {
 
   P_aug_ = MatrixXd(n_aug_, n_aug_);
 
-  // Sigma Points
-  Xsig_pred_ = MatrixXd(n_x_, 2 * n_aug_ + 1);
+  R_laser_ = MatrixXd(n_z_laser_, n_z_laser_);
+  R_laser_ << std_laspx_*std_laspx_, 0,
+	  0, std_laspy_*std_laspy_;
+
+  Xsig_pred_ = MatrixXd(n_x_, n_sig_);
 
   time_us_ = 0;
 
-  weights_ = VectorXd(2 * n_aug_ + 1);
+  weights_ = VectorXd(n_sig_);
 
   lambda_ = 3 - n_aug_;
 
@@ -99,23 +106,18 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
     P_aug_(6, 6) = std_yawdd_ * std_yawdd_;
 
     // init weights
+	weights_.fill(0.5 / (lambda_ + n_aug_));
     weights_(0) = lambda_ / (lambda_ + n_aug_);
-    for (int i = 1; i< 2 * n_aug_ + 1; i++) {  //2n+1 weights
-      double weight = 0.5 / (n_aug_ + lambda_);
-      weights_(i) = weight;
-    }
 
     if (meas_package.sensor_type_ == MeasurementPackage::RADAR) {
 
       double rho = meas_package.raw_measurements_(0);
-      double phi = meas_package.raw_measurements_(1);
+      double psi = meas_package.raw_measurements_(1);
       double rho_dot = meas_package.raw_measurements_(2);
-      double px = rho * cos(phi);
-      double py = rho * sin(phi);
-      double vx = rho_dot * cos(phi);
-      double vy = rho_dot * sin(phi);
+      double px = rho * cos(psi);
+      double py = rho * sin(psi);
 
-      x_ << px, py, vx, vy, 0;
+      x_ << px, py, rho_dot, psi, 0;
 
     } else if (meas_package.sensor_type_ == MeasurementPackage::LASER) {
 
@@ -187,7 +189,7 @@ void UKF::Prediction(double delta_t) {
   }
 
   //predict sigma points
-  for (int i = 0; i< 2 * n_aug_ + 1; i++)
+  for (int i = 0; i < n_sig_; i++)
   {
     //extract values for better readability
     double p_x = Xsig_aug(0,i);
@@ -231,13 +233,11 @@ void UKF::Prediction(double delta_t) {
     Xsig_pred_(4,i) = yawd_p;
   }
 
-  //predicted state mean
-  x_.fill(0);
   x_ = Xsig_pred_ * weights_;
 
   //predicted state covariance matrix
   P_.fill(0);
-  for (int i = 0; i < 2 * n_aug_ + 1; i++) {
+  for (int i = 0; i < n_sig_; i++) {
 
     // state difference
     VectorXd x_diff = Xsig_pred_.col(i) - x_;
@@ -260,20 +260,18 @@ void UKF::Prediction(double delta_t) {
  */
 void UKF::UpdateLidar(MeasurementPackage meas_package) {
   
-  int n_z = 2;
-  
   VectorXd z = meas_package.raw_measurements_;
   
-  MatrixXd Zsig = MatrixXd(n_z, 2 * n_aug_ + 1);
+  MatrixXd Zsig = MatrixXd(n_z_laser_, n_sig_);
   Zsig.fill(0.0);
   
-  MatrixXd S = MatrixXd(n_z, n_z);
+  MatrixXd S = MatrixXd(n_z_laser_, n_z_laser_);
   S.fill(0.0);
   
-  VectorXd z_pred = VectorXd(n_z);
+  VectorXd z_pred = VectorXd(n_z_laser_);
   z_pred.fill(0.0);
   
-  for (int i = 0; i < 2 * n_aug_ + 1; i++) {
+  for (int i = 0; i < n_sig_; i++) {
     double px = Xsig_pred_(0,i);
     double py = Xsig_pred_(1,i);
 
@@ -283,20 +281,17 @@ void UKF::UpdateLidar(MeasurementPackage meas_package) {
 
   z_pred = Zsig * weights_;
 
-  for (int i = 0; i < 2 * n_aug_ + 1; i++) {
+  for (int i = 0; i < n_sig_; i++) {
     VectorXd z_diff = Zsig.col(i) - z_pred;
     S = S + weights_(i) * z_diff * z_diff.transpose();
   }
 
-  MatrixXd R = MatrixXd(n_z, n_z);
-  R << std_laspx_*std_laspx_, 0,
-        0, std_laspy_*std_laspy_;
-  S = S + R;
+  S = S + R_laser_;
   
-  MatrixXd Tc = MatrixXd(n_x_, n_z);
+  MatrixXd Tc = MatrixXd(n_x_, n_z_laser_);
   Tc.fill(0.0);
   
-  for (int i = 0; i < 2 * n_aug_ + 1; i++) {
+  for (int i = 0; i < n_sig_; i++) {
     VectorXd z_diff = Zsig.col(i) - z_pred;
 
     VectorXd x_diff = Xsig_pred_.col(i) - x_;

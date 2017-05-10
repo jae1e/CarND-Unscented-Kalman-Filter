@@ -35,6 +35,9 @@ public:
   ///* augmented state covariance matrix
   MatrixXd P_aug_;
 
+  ///* R matrix for laser update
+  MatrixXd R_laser_;
+
   ///* predicted sigma points matrix
   MatrixXd Xsig_pred_;
 
@@ -70,6 +73,12 @@ public:
 
   ///* Augmented state dimension
   int n_aug_;
+
+  ///* Sigma state dimension
+  int n_sig_;
+
+  ///* laser state dimension
+  int n_z_laser_;
 
   ///* Sigma point spreading parameter
   double lambda_;
