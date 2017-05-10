@@ -29,10 +29,10 @@ UKF::UKF() {
   P_ = MatrixXd(n_x_, n_x_);
 
   // Process noise standard deviation longitudinal acceleration in m/s^2
-  std_a_ = 0.5;
+  std_a_ = 1.0;
 
   // Process noise standard deviation yaw acceleration in rad/s^2
-  std_yawdd_ = 1.0;
+  std_yawdd_ = 0.3;
 
   // Laser measurement noise standard deviation position1 in m
   std_laspx_ = 0.15;
@@ -78,7 +78,7 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
     cout << "UKF: " << endl;
 
     // init state vector
-    x_ << 0, 0, 0, 0, 0;
+    x_ << 1.0, 1.0, 1.0, 1.0, 0.1;
 
     // init augmented state vector
     x_aug_.head(5) = x_;
@@ -86,11 +86,11 @@ void UKF::ProcessMeasurement(MeasurementPackage meas_package) {
     x_aug_(6) = 0;
 
     // init state covariance matrix
-    P_ << 1, 0, 0, 0, 0,
-          0, 1, 0, 0, 0,
-          0, 0, 1000, 0, 0,
-          0, 0, 0, 1000, 0,
-          0, 0, 0, 0, 1;
+    P_ << 0.15, 0, 0, 0, 0,
+          0, 0.15, 0, 0, 0,
+          0, 0, 1.0, 0, 0,
+          0, 0, 0, 1.0, 0,
+          0, 0, 0, 0, 1.0;
 
     // init augmented state covariance matrix
     P_aug_.fill(0.0);
